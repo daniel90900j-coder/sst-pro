@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SST Pro</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body { font-family: Arial; margin:0; background:#f1f5f9; }
+header { background:#111827; color:white; padding:15px; text-align:center; }
+.container { padding:15px; }
+
+.card {
+  background:white;
+  padding:15px;
+  border-radius:12px;
+  margin-bottom:10px;
+  box-shadow:0 4px 8px rgba(0,0,0,0.08);
+}
+
+input, select, button {
+  width:100%;
+  padding:10px;
+  margin-top:5px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+button { background:#2563eb; color:white; border:none; }
+
+canvas { width:100%; height:120px; border:1px solid #000; }
+
+.logo { max-width:120px; }
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>SST PRO</h2>
+<img id="logoEmpresa" class="logo">
+</header>
+
+<div class="container">
+
+<!-- LOGIN -->
+<div class="card" id="loginDiv">
+<h3>Login</h3>
+<input id="email" placeholder="Email">
+<input id="senha" type="password" placeholder="Senha">
+<button onclick="login()">Entrar</button>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;">
+
+<div class="card">
+<h3>Logo da Empresa</h3>
+<input type="file" id="logoInput">
+<button onclick="salvarLogo()">Salvar Logo</button>
+</div>
+
+<div class="card">
+<h3>Nova Atividade</h3>
+<input id="atividade" placeholder="Descrição">
+<input id="responsavel" placeholder="Responsável">
+<input id="data" type="date">
+<button onclick="salvarAtividade()">Salvar</button>
+</div>
+
+<div class="card">
+<h3>Ficha de EPI</h3>
+<input id="colaborador" placeholder="Colaborador">
+<input id="epi" placeholder="EPI">
+<input id="quantidade" placeholder="Quantidade">
+<input id="dataEPI" type="date">
+<canvas id="assinaturaEPI"></canvas>
+<button onclick="salvarEPI()">Salvar EPI</button>
+</div>
+
+<div class="card">
+<h3>APR</h3>
+<input id="atividadeAPR" placeholder="Atividade">
+<select id="nivelRisco">
+<option>Baixo</option>
+<option>Médio</option>
+<option>Alto</option>
+</select>
+<input id="risco" placeholder="Risco">
+<input id="controle" placeholder="Controle">
+<canvas id="assinaturaAPR"></canvas>
+<button onclick="salvarAPR()">Salvar APR</button>
+</div>
+
+<div class="card">
+<button onclick="gerarPDF()">Gerar Relatório PDF</button>
+</div>
+
+</div>
+
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD0HScaKtORh7RTSQwWZLXAUXXStVUCkTc",
+  authDomain: "sst-pro-cd1dd.firebaseapp.com",
+  projectId: "sst-pro-cd1dd",
+  storageBucket: "sst-pro-cd1dd.appspot.com",
+  messagingSenderId: "227092686034",
+  appId: "1:227092686034:web:972b1794e7ebe98867f90b"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let logoBase64 = "";
+
+// LOGIN
+function login(){
+  auth.signInWithEmailAndPassword(email.value, senha.value)
+  .catch(e=>alert(e.message));
+}
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    loginDiv.style.display="none";
+    app.style.display="block";
+    carregarLogo();
+  }
+});
+
+// LOGO
+logoInput.addEventListener("change", e=>{
+  let reader = new FileReader();
+  reader.onload = ev=>{
+    logoBase64 = ev.target.result;
+    logoEmpresa.src = logoBase64;
+  };
+  reader.readAsDataURL(e.target.files[0]);
+});
+
+function salvarLogo(){
+  db.collection("empresas").doc(auth.currentUser.uid)
+  .set({logo: logoBase64}, {merge:true});
+}
+
+// ATIVIDADE
+function salvarAtividade(){
+  db.collection("atividades").add({
+    atividade: atividade.value,
+    responsavel: responsavel.value,
+    data: data.value
+  });
+}
+
+// EPI
+function salvarEPI(){
+  db.collection("epis").add({
+    colaborador: colaborador.value,
+    epi: epi.value,
+    quantidade: quantidade.value,
+    data: dataEPI.value,
+    assinatura: assinaturaEPI.toDataURL()
+  });
+}
+
+// APR
+function salvarAPR(){
+  db.collection("apr").add({
+    atividade: atividadeAPR.value,
+    nivel: nivelRisco.value,
+    risco: risco.value,
+    controle: controle.value,
+    assinatura: assinaturaAPR.toDataURL()
+  });
+}
+
+// PDF
+function gerarPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.text("RELATÓRIO SST", 10, 10);
+
+  db.collection("epis").get().then(snapshot=>{
+    snapshot.forEach(d=>{
+      let a = d.data();
+      doc.text(`${a.colaborador} - ${a.epi}`, 10, 20);
+      doc.addImage(a.assinatura, 'PNG', 10, 25, 40, 15);
+    });
+
+    doc.save("sst.pdf");
+  });
+}
+
+// CARREGAR LOGO
+function carregarLogo(){
+  db.collection("empresas").doc(auth.currentUser.uid)
+  .get().then(doc=>{
+    if(doc.data()?.logo){
+      logoEmpresa.src = doc.data().logo;
+    }
+  });
+}
+
+// ASSINATURA
+function ativarCanvas(id){
+  let canvas = document.getElementById(id);
+  let ctx = canvas.getContext("2d");
+  let desenhando=false;
+
+  canvas.onmousedown=()=>desenhando=true;
+  canvas.onmouseup=()=>desenhando=false;
+  canvas.onmousemove=e=>{
+    if(!desenhando) return;
+    ctx.lineTo(e.offsetX,e.offsetY);
+    ctx.stroke();
+  };
+}
+
+ativarCanvas("assinaturaEPI");
+ativarCanvas("assinaturaAPR");
+
+</script>
+
+</body>
+</html>
